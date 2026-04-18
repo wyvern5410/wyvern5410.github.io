@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<title>快捷启动</title>
+<!-- 现在 523 行, 改成 JS 生成按钮试试. --> 
+<!-- 用了 mylauncher:// 协议, 故参数中不能带空格和冒号, 分别用 英文井号# 和 英文分号; 代替。 --> 
+<head>
+    <meta charset="UTF-8">
+    <!-- meta http-equiv="X-UA-Compatible" content="IE=11" --> <!-- 强制IE兼容模式，支持ActiveX -->
+    <link rel="icon" type="image/x-icon" href="icons/chrome.ico">
+    <title>快捷启动</title>
+    <script src="./moveclock_lhb.js"></script>
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box; font-family: "微软雅黑", sans-serif;}
+        body {padding: 10px; display: flex; gap: 10px;}
+        .bgBlue { background: #def;}
+        .bgGreen {background: #cee;}
+        .bgYellow { background: #eec;}
+
+        /* 左侧快捷启动区 */
+        .launcher-box {flex: 2; border-radius: 8px; padding: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);}
+        .launcher-title {font-size: 22px; font-weight: bold; color: #333; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        .app-list {display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px;}
+        .app-item {display: flex; flex-direction: column; align-items: center; padding: 5px; border-radius: 5px; transition: all 0.3s; background: #e0f8f8;}
+        .app-item:hover {background: #1fef7f; color: white; transform: translateY(-4px); box-shadow: 0 3px 12px #074;}
+        .app-png  {margin: 14px; width: 128px;}
+        .app-name {font-size: 20px; font-weight: 600; text-align: center; margin-bottom: 6px;}
+        
+        /* 右侧硬件信息+备忘录区 */
+        .info-memo-box {flex: 1; display: flex; flex-direction: column; gap: 20px;}
+        .hardware-info {background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);}
+        .info-title {font-size: 18px; font-weight: bold; color: #333; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px;}
+        .info-item {font-size: 14px; margin: 8px 0; color: #555;}
+        
+        /* 备忘录列表样式 */
+        .memo-box {background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); flex: 1; display: flex; flex-direction: column;}
+        .memo-toolbar {display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;}
+        .memo-btn {padding: 6px 12px; border: none; border-radius: 4px; background: #019141; color: white; font-size: 12px;}
+        .memo-btn:hover {background: #03de6d;}
+        .memo-input-area {display: flex; gap: 10px; margin: 2px; margin-bottom: 10px;}
+        #memo-input {flex: 1; border: 1px solid #cee; border-radius: 4px; padding: 10px; font-size: 14px; resize: none; height: 80px;}
+        .memo-list {flex: 1; border: 1px solid #cee; border-radius: 4px; padding: 10px; overflow-y: auto; margin:2px;}
+        .memo-item {padding: 8px; margin-bottom: 8px; border-radius: 4px; background: #e0f8f8; position: relative;}
+        .memo-item:hover {background: #03de6d; }
+        .memo-time {font-size: 12px; color: #019141; margin-bottom: 4px;}
+        .memo-content {font-size: 14px; color: #333; margin: 2px;}
+        .memo-delete {position: absolute; top: 5px; right: 5px; color: #ee8833; cursor: pointer; font-size: 14px;}
+        .memo-delete:hover {color: #ee0000;}
+        
+        /* 下拉选择框大容器 */
+        .dropdown-container { position: absolute; top: 10px; left: 776px; width: 500px; align: right; }
+        /* 下拉触发按钮 */
+        .dropdown-btn { width: 99%; padding: 10px 10px; background: #f1ffff; border: 1px solid #49f;
+            border-radius: 4px; font-size: 15px; display: flex; justify-content: space-between;
+            align-items: center; transition: all 0.3s ease; box-shadow: 0 1px 4px #409eff;
+        }
+        .dropdown-btn:hover { border-color: #49f; padding-left: 20px; box-shadow: 0 4px 12px #409eff; }
+        /* 下拉选项列表 */
+        .dropdown-list { position: absolute; top: calc(100% + 8px); left: 0; width: 99%; 
+            max-height: 600px; /* 限制高度，超出显示滚动条 */
+            background: #f1ffff; border: 1px solid #e0e0e0; border-radius: 8px; list-style: none;  
+            overflow-y: auto; /* 垂直滚动条 */
+            display: none; /* 默认隐藏 */ box-shadow: 0 4px 12px #409eff; z-index: 100;
+        }
+        /* 下拉列表显示样式 */
+        .dropdown-list.show { display: block; }
+        /* 下拉选项 */
+        .dropdown-item { padding: 12px 15px; transition: all 0.2s ease; font-size: 15px; }
+        /* 鼠标悬浮效果 */
+        .dropdown-item:hover { background-color: #409eff; color: #ffffff; padding-left: 20px; box-shadow: 0 3px 12px #409eff; }        
+        /* 滚动条样式优化 */
+        .dropdown-list::-webkit-scrollbar { width: 6px; }
+        .dropdown-list::-webkit-scrollbar-thumb { background-color: #409eff; border-radius: 3px; } 
+        .dropdown-list::-webkit-scrollbar-track { background-color: #f5f7fa; }
+
+    </style>
+</head>
+<body>
+
+    <!-- 左侧快捷启动 🖥️ 📝 🗑️📝 ⚙️ 🔧 📊 -->
+    <div class="launcher-box">
+        <div class="launcher-title">
+            <div>
+                快捷启动
+            </div>        
+            <div class="dropdown-container">
+                <!-- 下拉触发按钮 -->
+                <button class="dropdown-btn hover-sound" id="dropdownBtn">
+                    网址导航 <span class="hover-sound" style="color: #409eff">▼</span>
+                </button>                
+                <!-- 下拉选项列表 -->
+                <ul class="dropdown-list" id="dropdownList">
+                    
+                    <li class="dropdown-item" data-url="./Typing-NoFix.htm">【打字练习】- 打错不用管 </li>
+                    <li class="dropdown-item" data-url="./Typing-BeFix.htm">【打字练习】- 打错要修正 </li>
+                    <li class="dropdown-item bgYellow" data-url="https://jxjy.scnu.edu.cn/#/login">【华南师范】- 直播课-华师在线-sfz-G!dou# </li>
+                    <li class="dropdown-item bgYellow" data-url="https://gdou.scnu.edu.cn/web/newindex/login.html">【华南师范】- 录播课-学生工作室-学号</li>
+                    <li class="dropdown-item bgYellow" data-url="https://pg.eeagd.edu.cn/ks/h5/index.html">【高考】- 广东高考报名-5131-L.21</li>
+                    
+                    <li class="dropdown-item bgBlue" data-url="https://typhoon.slt.zj.gov.cn">【天气】- 台风实时路径</li>
+                    <li class="dropdown-item bgBlue" data-url="https://chat.openai.com">ChatGPT - Open AI</li>
+                    <li class="dropdown-item bgBlue" data-url="https://tongyi.aliyun.com">通义千问 - 阿里云</li>
+                    <li class="dropdown-item bgBlue" data-url="https://spark.xiaoqi.ai">讯飞星火</li>
+                    <li class="dropdown-item bgBlue" data-url="https://www.moonshot.cn">月之暗面 - Kimi</li>
+                    <li class="dropdown-item bgBlue" data-url="https://www.zyai.com">智源AI</li>
+                    <li class="dropdown-item bgBlue" data-url="https://ai.baidu.com">百度智能云</li>
+                    <li class="dropdown-item bgBlue" data-url="https://wenxin.baidu.com">文心 - 百度(写作)</li>
+                    <li class="dropdown-item bgBlue" data-url="https://yiyan.baidu.com/">文心一言 - 百度(绘图)</li> 
+                    
+                    <li class="dropdown-item bgYellow" data-url="https://peal.cc/player">【音乐】 音乐播放机</li>
+                    <li class="dropdown-item bgYellow" data-url="https://www.fangpi.net">【音乐】 放屁音乐网(下载)</li>                    
+                    <li class="dropdown-item bgYellow" data-url="https://tonzhon.whamon.com/">【音乐】- 铜钟-wyv54-118675(下载)</li>                    
+                    <li class="dropdown-item" data-url="https://developer.mozilla.org/zh-CN/docs/Web/CSS">【开发】CSS层叠样式表 - MDN</li> 
+                    <li class="dropdown-item" data-url="https://cloud.huawei.com/">【开发】华为云空间 - Cloud</li> 
+                    <li class="dropdown-item" data-url="https://www.gitee.com/">【开发】码云 - Cloud</li> 
+                    
+                </ul>
+            </div>
+        </div>
+        <div class="app-list" id="appListId">
+            <!-- 按钮列表, 待程序使用 innerHTML 加入 -->
+        </div>
+    </div>
+
+    <!-- 右侧硬件信息+备忘录 -->
+    <div class="info-memo-box">
+        <!-- 硬件信息（电池） -->
+        <div class="hardware-info">
+            <div class="info-title">硬件信息（电池）</div>
+            <div class="info-item">电池电量：<span id="battery-level">加载中...</span></div>
+            <div class="info-item">充电状态：<span id="battery-charging">加载中...</span></div>
+            <div class="info-item">充电功率：<span id="battery-power">Windows 暂不直接支持</span></div>
+            <div class="info-item">当前时间：<span id="current-time"></span></div>
+        </div>
+
+        <!-- 备忘录（列表版） -->
+        <div class="memo-box">
+            <div class="info-title">备忘录（最近100条）</div>
+            <div class="memo-toolbar">
+                <button class="memo-btn hover-sound" onclick="addMemo()">添加备忘录</button>
+                <button class="memo-btn hover-sound" onclick="exportMemo()">导出全部</button>
+                <button class="memo-btn hover-sound" onclick="importMemo()">导入备忘录</button>
+                <button class="memo-btn hover-sound" onclick="clearAllMemo()">清空全部</button>
+            </div>
+            <div class="memo-input-area">
+                <textarea id="memo-input" placeholder="请输入备忘录内容..."></textarea>
+            </div>
+            <div class="memo-list" id="memo-list"></div>
+        </div>
+    </div>
+
+    <script>
+    
+    // 按钮列表, 类型: 1-App, 2-网址, 名称, 命令或网址, 图标 
+    AppListArr = [
+      {type: 1, name: '我的电脑', icon: 'icons/MyComputer.png', cmd: 'explorer.exe' },
+      {type: 1, name: '回收站', icon: 'icons/RecycleBin.png', cmd: 'explorer.exe shell:RecycleBinFolder' },
+      {type: 1, name: 'CMD 命令行', icon: 'icons/cmd-256.png', cmd: 'cmd.exe' },
+      {type: 1, name: '记事本', icon: 'icons/Notepad.png', cmd: 'notepad.exe' },
+      {type: 1, name: '控制面板', icon: 'icons/controlpad.png', cmd: 'control.exe' },
+      {type: 1, name: '我的服务', icon: 'icons/list-02.png', cmd: 'services.msc' },
+      {type: 1, name: '任务管理器', icon: 'icons/MyComp02.png', cmd: 'taskmgr.exe' },
+      {type: 1, name: 'Chrome', icon: 'icons/chrome.png', cmd: 'S:/soft/chrome/chrome.exe' },
+      {type: 1, name: 'MS Edge', icon: 'icons/edge.png', cmd: '&quot;D:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe&quot;'},
+      {type: 1, name: '百度网盘', icon: 'icons/BaiduND.png', cmd: 'S:/soft/BaiduNetdisk/BaiduNetdisk.exe' },
+      {type: 1, name: '微信-S', icon: 'icons/weixin.png', cmd: 'S:/soft/weixin/weixin.exe' },
+      {type: 1, name: 'QQ', icon: 'icons/qq.png', cmd: 'S:/soft/we_QQ/QQ.exe' },
+      {type: 1, name: '企业微信', icon: 'icons/WXWork.png', cmd: 'S:/soft/WXWork/WXWork.exe' },
+      {type: 1, name: '腾讯会议', icon: 'icons/wemeet.png', cmd: 'S:/soft/WeMeet/wemeetapp.exe' },
+      {type: 2, name: '豆包', icon: 'icons/doubao.png', cmd: 'https://www.doubao.com/' },
+      {type: 2, name: 'deepseek', icon: 'icons/deepseek.png', cmd: 'https://chat.deepseek.com/' },
+      {type: 2, name: '百度', icon: 'icons/baidu.png', cmd: 'https://www.baidu.com/' },
+      {type: 2, name: '腾讯文档', icon: 'icons/DocsQQ.png', cmd: 'https://docs.qq.com/' },
+      {type: 2, name: '金山文档', icon: 'icons/wpsDoc.png', cmd: 'https://www.kdocs.cn/' },
+      {type: 2, name: '华为云', icon: 'icons/huawei.png', cmd: 'https://cloud.huawei.com/' },
+      {type: 2, name: 'Bili Bili', icon: 'icons/bilibili.png', cmd: 'https://www.bilibili.com/' },
+      {type: 1, name: 'Everything', icon: 'icons/everything.png', cmd: 'S:/soft/Everything/Everything.exe' },
+      {type: 1, name: '迅雷', icon: 'icons/thunder.png', cmd: 'S:/soft/Thunder/Program/Thunder.exe' },
+      {type: 1, name: '酷我音乐', icon: 'icons/kuwo.png', cmd: 'S:/soft/Kuwo/bin/kwMusic.exe' },
+      {type: 1, name: 'EmEditor', icon: 'icons/emeditor.png', cmd: 'S:/soft/EmEditor/EmEditor.exe' },
+      {type: 1, name: 'VSCode', icon: 'icons/vscode.png', cmd: 'S:/dev/VSCode/Code.exe' },
+      {type: 1, name: 'Zed', icon: 'icons/zed.png', cmd: 'S:/dev/Zed/Zed.exe' },
+      {type: 1, name: 'Eclipse', icon: 'icons/eclipse.png', cmd: 'S:/dev/eclipse/eclipse.exe' },
+      {type: 1, name: 'PS CS6 x64', icon: 'icons/photoshop.png', cmd: 'S:/soft/photoshop/photoshop.exe,1' },
+      {type: 1, name: '通达信', icon: 'icons/tdx.png', cmd: 'S:/soft/tdx/tdxW.exe' },
+      
+    ]
+    
+    // 渲染左侧的按钮
+    function renderAppList() {
+        const listEl = document.getElementById('appListId');
+        listEl.innerHTML = '';
+        // 按钮列表遍历 
+        AppListArr.slice().forEach((item, index) => {
+            const el = document.createElement('div');
+            //el.className = 'app-item';
+            el.innerHTML = `
+              <div class="app-item" onclick="openApp('${item.cmd}')">
+                  <img src="${item.icon}" class="app-png">
+                  <div class="app-name">${item.name}</div>
+              </div>
+            `;
+            // 为新的列表元素增加鼠标进入音效 
+            el.addEventListener('mouseenter', playHoverSound);
+            listEl.appendChild(el);
+        });
+    }
+    // 开始执行渲染 
+    renderAppList(); 
+    
+        // ==================== 1. 预加载声音，需要先点击一下空白处 ====================   
+        // 预加载音频（避免延迟）
+        const hoverAudio = new Audio('icons/_bi.mp3');
+        hoverAudio.volume = 0.8;
+        hoverAudio.preload = 'auto';
+    
+        // 播放函数（快速重置+播放）
+        function playHoverSound() {
+            hoverAudio.currentTime = 0; // 重置到开头
+            hoverAudio.play().catch(err => console.log('音频未激活:', err));
+        }
+    
+        // 绑定所有 hover-sound 元素
+        document.querySelectorAll('.hover-sound').forEach(item => {
+            item.addEventListener('mouseenter', playHoverSound);
+        });
+    
+        // 首次点击激活音频
+        document.addEventListener('click', () => { 
+            hoverAudio.play().catch(() => {}); 
+            // 加载移动时钟
+            moveClockLhb.initClockHTML();
+        }, { once: true });
+        
+        // ==================== 1. 修复本地应用调用（核心） ====================
+
+        // 替换原openApp函数
+        function openApp(appName) {
+            try {
+                // 调用自定义协议 mylauncher://appName
+                // 需要将空格转换成井号, 将冒号转换成分号, 反斜杠转成正斜杠。(暂时废弃!)
+                // let param1 = appName.replaceAll(' ', '#').replaceAll(':', ';').replaceAll('\\', '/');
+                // 2. HTML 中双引号要使用 &quot; 或者 &#34 来表示。 
+                // 3. 将参数进行 Base64 编码, 免得处理太多的特殊字符, 在 BAT 端进行解码需要加上unescape( )函数.  
+                let param = btoa(unescape(encodeURIComponent(appName)));
+                console.log("替换参数: ", appName, "\n", param);
+                const a = document.createElement('a');
+                a.href = `mylauncher://${param}`;
+                a.target = "_self"; // 不新开页面
+                a.click();
+            } catch (e) {
+                alert(`打开失败：${param}\n请检查自定义协议是否注册成功！`);
+            }
+        }
+
+        // ==================== 2. 电池信息 + 时间 ====================
+        function getBatteryInfo() {
+            if (!navigator.getBattery) {
+                document.getElementById('battery-level').textContent = "浏览器不支持";
+                document.getElementById('battery-charging').textContent = "浏览器不支持";
+                return;
+            }
+            navigator.getBattery().then(battery => {
+                const level = (battery.level * 100).toFixed(0) + '%';
+                document.getElementById('battery-level').textContent = level;
+                const charging = battery.charging ? "正在充电" : "未充电";
+                document.getElementById('battery-charging').textContent = charging;
+                // 监听变化
+                battery.addEventListener('levelchange', getBatteryInfo);
+                battery.addEventListener('chargingchange', getBatteryInfo);
+            });
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            document.getElementById('current-time').textContent = timeStr;
+        }
+
+        // ==================== 3. 备忘录列表功能（支持100条） ====================
+        const MEMO_MAX_COUNT = 100; // 最多保存100条
+        let memoList = [];
+
+        // 初始化加载备忘录
+        function initMemo() {
+            const saved = localStorage.getItem('memoList');
+            memoList = saved ? JSON.parse(saved) : [];
+            renderMemoList();
+        }
+
+        // 渲染备忘录列表
+        function renderMemoList() {
+            const listEl = document.getElementById('memo-list');
+            listEl.innerHTML = '';
+            // 倒序显示（最新的在最上面）
+            memoList.slice().reverse().forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'memo-item';
+                el.innerHTML = `
+                    <div class="memo-time">${item.time}</div>
+                    <div class="memo-content">${item.content.replace(/\n/g, '<br>')}</div>
+                    <span class="memo-delete" onclick="deleteMemo(${index})">删除</span>
+                `;
+                // 为新的列表元素增加鼠标进入音效 
+                el.addEventListener('mouseenter', playHoverSound);
+                listEl.appendChild(el);
+            });
+            // 保存到本地
+            localStorage.setItem('memoList', JSON.stringify(memoList));
+        }
+
+        // 添加备忘录
+        function addMemo() {
+            const input = document.getElementById('memo-input');
+            const content = input.value.trim();
+            if (!content) {
+                alert('请输入备忘录内容！');
+                return;
+            }
+            const now = new Date().toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            memoList.push({ time: now, content: content });
+            // 限制最多100条
+            if (memoList.length > MEMO_MAX_COUNT) {
+                memoList.shift(); // 删除最早的一条
+            }
+            renderMemoList();
+            input.value = ''; // 清空输入框
+        }
+
+        // 删除单条备忘录
+        function deleteMemo(index) {
+            if (confirm('确定删除这条备忘录吗？')) {
+                memoList.splice(index, 1);
+                renderMemoList();
+            }
+        }
+
+        // 导出全部备忘录
+        function exportMemo() {
+            if (memoList.length === 0) {
+                alert('暂无备忘录可导出！');
+                return;
+            }
+            // 格式化导出内容
+            let exportContent = '';
+            memoList.forEach((item, index) => {
+                exportContent += `【${index + 1}】${item.time}\n${item.content}\n\n`;
+            });
+            const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+            const a = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            a.href = URL.createObjectURL(blob);
+            a.download = `备忘录_${timestamp}.txt`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        // 导入备忘录
+        function importMemo() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.txt';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function() {
+                    // 简单解析导入内容（按行分割，兼容手动编辑）
+                    const content = reader.result;
+                    const lines = content.split('\n');
+                    let newMemos = [];
+                    let currentContent = '';
+                    let currentTime = '';
+                    lines.forEach(line => {
+                        line = line.trim();
+                        if (line.startsWith('【') && line.includes('】')) {
+                            // 有时间戳的行
+                            if (currentContent) {
+                                newMemos.push({ time: currentTime || new Date().toLocaleString(), content: currentContent });
+                                currentContent = '';
+                            }
+                            currentTime = line.split('】')[1] || '';
+                        } else if (line) {
+                            currentContent += (currentContent ? '\n' : '') + line;
+                        }
+                    });
+                    // 最后一条
+                    if (currentContent) {
+                        newMemos.push({ time: currentTime || new Date().toLocaleString(), content: currentContent });
+                    }
+                    // 合并到现有列表，限制100条
+                    memoList = [...memoList, ...newMemos].slice(-MEMO_MAX_COUNT);
+                    renderMemoList();
+                    alert(`成功导入 ${newMemos.length} 条备忘录！`);
+                };
+                reader.readAsText(file, 'utf-8');
+            };
+            input.click();
+        }
+
+        // 清空全部备忘录
+        function clearAllMemo() {
+            if (confirm('确定清空所有备忘录吗？此操作不可恢复！')) {
+                memoList = [];
+                renderMemoList();
+                alert('已清空所有备忘录！');
+            }
+        }
+
+        // ==================== 初始化 ====================
+        window.onload = function() {
+            // 启用ActiveX（Edge兼容模式）
+            try {
+                document.domain = document.domain;
+            } catch (e) {}
+            // 加载电池信息和时间
+            getBatteryInfo();
+            updateTime();
+            setInterval(updateTime, 1000);
+            // 初始化备忘录
+            initMemo();
+        };
+    
+    <!-- ================================== 网址下拉框相关脚本 ================================= -->
+    
+        // 获取DOM元素
+        const dropdownBtn = document.getElementById('dropdownBtn');
+        const dropdownList = document.getElementById('dropdownList');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+
+        // 切换下拉列表显示/隐藏
+        dropdownBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 阻止事件冒泡
+            dropdownList.classList.toggle('show');
+        });
+
+        // 点击页面其他位置关闭下拉列表
+        document.addEventListener('click', () => {
+            dropdownList.classList.remove('show');
+        });
+
+        // 为每个选项添加事件
+        dropdownItems.forEach(item => {
+            // 鼠标悬浮播放音效
+            item.addEventListener('mouseenter', playHoverSound);
+            // 点击选项打开新页面
+            item.addEventListener('click', () => {
+                const url = item.getAttribute('data-url');
+                window.open(url, '_blank'); // 新标签页打开
+                dropdownList.classList.remove('show'); // 关闭下拉列表
+            });
+        });
+    </script>
+</body>
+</html>

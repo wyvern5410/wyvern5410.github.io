@@ -1,0 +1,12 @@
+Windows Registry Editor Version 5.00
+
+; 注册自定义协议 mylauncher://
+[HKEY_CLASSES_ROOT\mylauncher]
+@="URL:MyLauncher Protocol"
+"URL Protocol"=""
+
+; 协议关联到批处理
+[HKEY_CLASSES_ROOT\mylauncher\shell]
+[HKEY_CLASSES_ROOT\mylauncher\shell\open]
+[HKEY_CLASSES_ROOT\mylauncher\shell\open\command]
+@="\"S:\\soft\\_bat\\AppStart\\launch_app.bat\" \"%1\""
